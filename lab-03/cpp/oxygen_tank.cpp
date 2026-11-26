@@ -5,8 +5,8 @@ namespace space_station
 {
 
     OxygenTank::OxygenTank(int capacity, double initialLevel)
-        : m_capacity{ capacity }
-        , m_oxygenLevel{ initialLevel }
+        : m_oxygenLevel{ initialLevel }
+        , m_capacity{ capacity }
     {
         std::cout << "[OxygenTank] Создан баллон емкостью " << m_capacity
             << " с уровнем кислорода " << m_oxygenLevel << "%\n";

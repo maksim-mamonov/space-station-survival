@@ -15,7 +15,7 @@ namespace space_station
     public:
         OxygenTank(int capacity, double initialLevel);
 
-        OxygenTank() = delete; // Запретим конструктор по умолчанию, если нужен всегда осмысленный баллон (или оставим, но сделаем с параметрами)
+        OxygenTank() = delete; // баллон всегда создается с осмысленной емкостью и уровнем
         ~OxygenTank();
 
         // Содержательные методы

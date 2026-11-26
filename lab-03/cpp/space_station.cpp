@@ -17,6 +17,11 @@ namespace space_station
         // При вызове этого деструктора автоматически вызовется деструктор m_lifeSupport (композиция).
     }
 
+    void SpaceStation::ConnectOxygenTank(const std::shared_ptr<OxygenTank>& tank)
+    {
+        m_lifeSupport.ConnectOxygenTank(tank);
+    }
+
     void SpaceStation::ActivateStation()
     {
         std::cout << "[SpaceStation] Инициирован запуск систем станции \"" << m_stationName << "\"...\n";

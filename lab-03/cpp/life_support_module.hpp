@@ -1,7 +1,9 @@
 ﻿#pragma once
 
 #include "oxygen_tank.hpp"
+#include <memory>
 #include <string>
+#include <string_view>
 
 namespace space_station
 {
@@ -12,17 +14,18 @@ namespace space_station
         std::string m_moduleName;
         bool m_isActive{ false };
 
-        // Агрегация: модуль хранит указатель на внешний кислородный баллон
-        OxygenTank* m_oxygenTank{ nullptr };
+        // Агрегация: модуль пользуется внешним баллоном, но не владеет им.
+        // weak_ptr не продлевает баллону жизнь и позволяет проверить, жив ли он.
+        std::weak_ptr<OxygenTank> m_oxygenTank{};
 
         static constexpr auto TAG = "life_support_module";
 
     public:
-        LifeSupportModule(std::string_view name);
+        explicit LifeSupportModule(std::string_view name);
         ~LifeSupportModule();
 
-        // Метод для реализации агрегации: подключение внешнего баллона
-        void ConnectOxygenTank(OxygenTank* tank);
+        // Метод агрегации: подключение внешнего баллона (владелец остаётся снаружи)
+        void ConnectOxygenTank(const std::shared_ptr<OxygenTank>& tank);
 
         // Содержательные методы
         void StartModule();
@@ -37,6 +40,11 @@ namespace space_station
         [[nodiscard]] bool IsActive() const
         {
             return m_isActive;
+        }
+
+        [[nodiscard]] bool HasOxygenTank() const
+        {
+            return !m_oxygenTank.expired();
         }
     };
 

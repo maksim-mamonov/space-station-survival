@@ -1,7 +1,9 @@
 ﻿#pragma once
 
 #include "life_support_module.hpp"
+#include <memory>
 #include <string>
+#include <string_view>
 
 namespace space_station
 {
@@ -11,8 +13,8 @@ namespace space_station
     private:
         std::string m_stationName;
 
-        // Композиция: модуль жизнеобеспечения создается внутри станции и является ее частью.
-        // Он не существует отдельно от станции.
+        // Композиция: модуль жизнеобеспечения — поле по значению.
+        // Он создаётся и уничтожается вместе со станцией, указатель не нужен.
         LifeSupportModule m_lifeSupport;
 
         static constexpr auto TAG = "space_station";
@@ -22,15 +24,13 @@ namespace space_station
         SpaceStation(std::string_view stationName, std::string_view moduleName);
         ~SpaceStation();
 
+        // Подключение внешнего баллона к встроенному модулю.
+        // Часть наружу не отдаётся: станция сама делегирует вызов своему модулю.
+        void ConnectOxygenTank(const std::shared_ptr<OxygenTank>& tank);
+
         // Содержательные методы
         void ActivateStation();
         void PerformLifeSupportCheck(double oxygenAmount);
-
-        // Доступ к части (через методы целого, как требует задание)
-        [[nodiscard]] LifeSupportModule& GetLifeSupportModule()
-        {
-            return m_lifeSupport;
-        }
 
         // Геттеры
         [[nodiscard]] std::string_view GetStationName() const

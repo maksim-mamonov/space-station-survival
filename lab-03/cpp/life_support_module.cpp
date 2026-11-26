@@ -13,20 +13,20 @@ namespace space_station
     LifeSupportModule::~LifeSupportModule()
     {
         std::cout << "[LifeSupportModule] Уничтожен модуль жизнеобеспечения: \"" << m_moduleName << "\"\n";
-        // Важно для агрегации: мы НЕ удаляем m_oxygenTank здесь, 
-        // потому что модуль не владеет им (его уничтожит тот, кто создал — main).
+        // Баллон здесь не уничтожается: weak_ptr им не владеет.
     }
 
-    void LifeSupportModule::ConnectOxygenTank(OxygenTank* tank)
+    void LifeSupportModule::ConnectOxygenTank(const std::shared_ptr<OxygenTank>& tank)
     {
-        m_oxygenTank = tank;
+        m_oxygenTank = tank; // счётчик владельцев баллона при этом не растёт
         std::cout << "[LifeSupportModule] К модулю \"" << m_moduleName << "\" успешно подключен кислородный баллон.\n";
     }
 
     void LifeSupportModule::StartModule()
     {
-        // Проверка правила: нельзя запустить модуль, если к нему не подключен кислородный баллон
-        if (m_oxygenTank == nullptr)
+        // Проверка правила: нельзя запустить модуль, если к нему не подключен
+        // кислородный баллон (или подключенный баллон уже уничтожен)
+        if (m_oxygenTank.expired())
         {
             std::cout << "[LifeSupportModule Error] Ошибка запуска \"" << m_moduleName
                 << "\": Отсутствует подключенный кислородный баллон!\n";
@@ -46,15 +46,19 @@ namespace space_station
             return;
         }
 
-        if (m_oxygenTank == nullptr)
+        // lock() даёт временного владельца: непустой, если баллон жив, и пустой, если уже уничтожен
+        const std::shared_ptr<OxygenTank> tank = m_oxygenTank.lock();
+        if (!tank)
         {
-            std::cout << "[LifeSupportModule Error] Нет баллона для расхода кислорода!\n";
+            std::cout << "[LifeSupportModule Error] Баллон модуля \"" << m_moduleName
+                << "\" уже уничтожен, расход кислорода невозможен!\n";
+            m_isActive = false;
             return;
         }
 
         // Делегируем работу баллону
         std::cout << "[LifeSupportModule] Подача команды баллону на расход " << amount << "% кислорода...\n";
-        m_oxygenTank->ConsumeOxygen(amount);
+        tank->ConsumeOxygen(amount);
     }
 
 } // namespace space_station

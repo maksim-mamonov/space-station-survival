@@ -1,136 +1,166 @@
-﻿#include <iostream>
+﻿#include <clocale>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
 #include "oxygen_tank.hpp"
 #include "life_support_module.hpp"
 #include "space_station.hpp"
 
-// Используем псевдоним пространства имен локально в main, 
-// чтобы не писать везде space_station:: (но в .hpp файлах using namespace запрещен, помним об этом)
+// Псевдоним пространства имен используется только в main.cpp
+// (в .hpp файлах using namespace запрещен)
 using namespace space_station;
 
 int main()
 {
-    // Установка русской локали для корректного отображения кириллицы в консоли Windows
-    system("chcp 65001 > nul");
+#ifdef _WIN32
+    // Установка кодовой страницы UTF-8 для корректного отображения кириллицы в консоли Windows
+    std::system("chcp 65001 > nul");
+#endif
     std::setlocale(LC_ALL, "Russian");
 
-
-    std::cout << "=== СТАРТ ДЕМОНСТРАЦИОННОЙ ПРОГРАММЫ КОСМИЧЕСКОЙ СТАНЦИИ ===\n\n";
+    std::cout << "=== СТАРТ ДЕМОНСТРАЦИОННОЙ ПРОГРАММЫ КОСМИЧЕСКОЙ СТАНЦИИ (ЛР 3, УМНЫЕ УКАЗАТЕЛИ) ===\n\n";
 
     // ==========================================
-    // ПУНКТ 1: Работа с агрегацией и динамической памятью (new / delete)
-    // Создаем кислородный баллон отдельно (во внешнем блоке/области видимости)
+    // ПУНКТ 1: Агрегация через shared_ptr + weak_ptr
+    // Баллоном владеет main (shared_ptr), модуль только наблюдает за ним (weak_ptr)
     // ==========================================
-    std::cout << "--- ДЕМОНСТРАЦИЯ АГРЕГАЦИИ И DYNAMIC MEMORY (NEW / DELETE) ---\n";
+    std::cout << "--- 1. АГРЕГАЦИЯ: ВЛАДЕЛЕЦ SHARED_PTR, НАБЛЮДАТЕЛЬ WEAK_PTR ---\n";
 
-    // Динамическое создание объекта через оператор new
-    OxygenTank* externalTank = new OxygenTank(150, 100.0);
+    std::shared_ptr<OxygenTank> externalTank = std::make_shared<OxygenTank>(150, 100.0);
+    std::cout << "externalTank.use_count() = " << externalTank.use_count() << "\n";
 
-    // Создаем автономный модуль жизнеобеспечения на стеке (статическая инициализация)
     LifeSupportModule manualModule("Вспомогательный отсек");
-
-    // Передаем внешний баллон в модуль (реализация агрегации)
     manualModule.ConnectOxygenTank(externalTank);
+    std::cout << "После подключения к модулю use_count() = " << externalTank.use_count()
+        << " (weak_ptr не увеличивает счётчик)\n";
 
-    // Проверка работы методов
     manualModule.StartModule();
     manualModule.ConsumeModuleOxygen(30.0);
 
     std::cout << "\n";
 
     // ==========================================
-    // ПУНКТ 2: Проверка правила (сначала успех, потом отказ)
+    // ПУНКТ 2: Проверка правил (сначала успех, потом отказ)
     // ==========================================
-    std::cout << "--- ДЕМОНСТРАЦИЯ ПРОВЕРКИ ПРАВИЛ (УСПЕХ И ОТКАЗ) ---\n";
+    std::cout << "--- 2. ПРОВЕРКА ПРАВИЛ (УСПЕХ И ОТКАЗ) ---\n";
 
-    // Успешный расход
     externalTank->ConsumeOxygen(20.0);
 
-    // Попытка нарушить правило 1: расход больше, чем осталось в баллоне
     std::cout << "[Тест нарушения 1]: Попытка потратить 200% кислорода...\n";
-    externalTank->ConsumeOxygen(200.0); // Сработает проверка правила и отказ
+    externalTank->ConsumeOxygen(200.0);
 
-    // Попытка нарушить правило 2: запуск модуля без баллона
     LifeSupportModule emptyModule("Пустой отсек без баллона");
     std::cout << "[Тест нарушения 2]: Попытка запустить модуль без баллона...\n";
-    emptyModule.StartModule(); // Сработает проверка правила (указатель nullptr) и отказ
+    emptyModule.StartModule();
 
     std::cout << "\n";
 
     // ==========================================
-    // ПУНКТ 3: Работа с композицией и временем жизни объектов (Блоки видимости { ... })
-    // Показываем, что при уничтожении целого автоматически уничтожается часть
+    // ПУНКТ 3: Композиция и weak_ptr после уничтожения объекта
     // ==========================================
-    std::cout << "--- ДЕМОНСТРАЦИЯ КОМПОЗИЦИИ И ВРЕМЕНИ ЖИЗНИ (ВЛОЖЕННЫЙ БЛОК) ---\n";
-
+    std::cout << "--- 3. КОМПОЗИЦИЯ И WEAK_PTR ПОСЛЕ УНИЧТОЖЕНИЯ БАЛЛОНА ---\n";
     {
         std::cout << "--> Вход во вложенный блок (создаем станцию 'Мир-2')...\n";
 
-        // Создаем космическую станцию. В ее конструкторе создается встроенный модуль (композиция).
+        // Модуль жизнеобеспечения создается внутри станции (композиция, поле по значению)
         SpaceStation station("Мир-2", "Центральный жизнеобеспечивающий узел");
 
-        // Создаем еще один баллон динамически для станции
-        OxygenTank* stationTank = new OxygenTank(200, 100.0);
-
-        // Получаем ссылку на часть через метод целого и подключаем баллон
-        station.GetLifeSupportModule().ConnectOxygenTank(stationTank);
+        std::shared_ptr<OxygenTank> stationTank = std::make_shared<OxygenTank>(200, 100.0);
+        station.ConnectOxygenTank(stationTank);
         station.ActivateStation();
-
         station.PerformLifeSupportCheck(40.0);
 
-        // Уничтожаем вспомогательный баллон станции явно через delete
-        delete stationTank;
+        // Вместо delete: последний владелец отказывается от баллона, и баллон уничтожается сразу
+        std::cout << "--> stationTank.reset(): единственный владелец отказывается от баллона\n";
+        stationTank.reset();
+
+        // В ЛР 2 здесь модуль хранил бы висячий указатель. weak_ptr::lock() вернет пустой указатель.
+        std::cout << "--> Повторная проверка жизнеобеспечения после уничтожения баллона:\n";
+        station.PerformLifeSupportCheck(10.0);
 
         std::cout << "--> Выход из вложенного блока (станция сейчас уничтожится)...\n";
     }
-    // ТУТ ВЫХОДИМ ИЗ БЛОКА: срабатывает деструктор SpaceStation, 
-    // который автоматически вызывает деструктор своего модуля `m_lifeSupport` (композиция!).
 
     std::cout << "\n";
 
     // ==========================================
-    // ПУНКТ 4: Массивы объектов (динамический массив и массив динамических объектов)
+    // ПУНКТ 4: unique_ptr — единственный владелец, передача владения через std::move
     // ==========================================
-    std::cout << "--- ДЕМОНСТРАЦИЯ РАБОТЫ С МАССИВАМИ ОБЪЕКТОВ ---\n";
-
-    // Массив динамических объектов (указателей)
-    const int tankCount = 2;
-    OxygenTank* tankArray[tankCount] = {
-        new OxygenTank(100, 50.0),
-        new OxygenTank(120, 80.0)
-    };
-
-    std::cout << "Использование массива динамических баллонов:\n";
-    for (int i = 0; i < tankCount; ++i)
+    std::cout << "--- 4. UNIQUE_PTR: УНИЧТОЖЕНИЕ ПРИ ВЫХОДЕ ИЗ БЛОКА ---\n";
     {
-        std::cout << "Баллон #" << i + 1 << " уровень: " << tankArray[i]->GetOxygenLevel() << "%\n";
+        std::cout << "--> Вход в блок\n";
+        std::unique_ptr<OxygenTank> spareTank = std::make_unique<OxygenTank>(80, 100.0);
+        spareTank->ConsumeOxygen(15.0);
+        std::cout << "--> Выход из блока (delete не вызывается)\n";
     }
 
-    // Очищаем память массива динамических объектов
-    for (int i = 0; i < tankCount; ++i)
+    std::cout << "\n--- 4.1. UNIQUE_PTR: МАССИВ БАЛЛОНОВ И ПЕРЕДАЧА ВЛАДЕНИЯ ---\n";
     {
-        delete tankArray[i];
+        constexpr int kTankCount = 2;
+        std::unique_ptr<OxygenTank> tankArray[kTankCount] = {
+            std::make_unique<OxygenTank>(100, 50.0),
+            std::make_unique<OxygenTank>(120, 80.0)
+        };
+
+        std::cout << "Использование массива баллонов:\n";
+        for (int i = 0; i < kTankCount; ++i)
+        {
+            std::cout << "Баллон #" << i + 1 << " уровень: " << tankArray[i]->GetOxygenLevel() << "%\n";
+        }
+
+        std::cout << "Передаем баллон #1 новому владельцу через std::move...\n";
+        std::unique_ptr<OxygenTank> transferredTank = std::move(tankArray[0]);
+
+        for (int i = 0; i < kTankCount; ++i)
+        {
+            if (tankArray[i])
+            {
+                std::cout << "tankArray[" << i << "] владеет баллоном емкостью " << tankArray[i]->GetCapacity() << "\n";
+            }
+            else
+            {
+                std::cout << "tankArray[" << i << "] пуст: владение передано\n";
+            }
+        }
+        std::cout << "transferredTank владеет баллоном емкостью " << transferredTank->GetCapacity() << "\n";
+
+        std::cout << "--> Выход из блока: баллоны уничтожаются в обратном порядке объявления\n";
     }
 
     std::cout << "\n";
 
     // ==========================================
-    // ПУНКТ 5: Проверка агрегации (время жизни независимого объекта)
+    // ПУНКТ 5: shared_ptr — счётчик владельцев
     // ==========================================
-    std::cout << "--- ПРОВЕРКА АГРЕГАЦИИ: ЖИЗНЬ ОБЪЕКТА ПОСЛЕ УНИЧТОЖЕНИЯ АГРЕГАТОРА ---\n";
-    std::cout << "Модуль manualModule уничтожается, но внешний баллон (externalTank) должен жить:\n";
+    std::cout << "--- 5. SHARED_PTR: СЧЁТЧИК ВЛАДЕЛЬЦЕВ ---\n";
+    std::cout << "externalTank.use_count() = " << externalTank.use_count() << "\n";
+    {
+        std::shared_ptr<OxygenTank> inspectorCopy = externalTank;
+        std::cout << "После копирования указателя use_count() = " << externalTank.use_count() << "\n";
+        std::cout << "--> Выход из блока: копия уничтожается\n";
+    }
+    std::cout << "После уничтожения копии use_count() = " << externalTank.use_count() << "\n\n";
 
-    // Уничтожаем `manualModule` (он выходит из области видимости функции main в самом конце, 
-    // но мы можем проверить состояние externalTank прямо сейчас).
-    manualModule.ConsumeModuleOxygen(10.0); // Модуль еще жив, отдает команду баллону
+    std::cout << "--- 5.1. ОБЪЕКТ ЖИВЕТ, ПОКА ЖИВ ХОТЯ БЫ ОДИН ВЛАДЕЛЕЦ ---\n";
+    {
+        std::shared_ptr<OxygenTank> backupOwner = externalTank;
+        std::cout << "Владельцев: " << backupOwner.use_count() << "\n";
 
-    // Проверяем, что сам внешний баллон (externalTank), созданный через new в начале, 
-    // всё еще существует и доступен напрямую!
-    std::cout << "Проверка externalTank напрямую после работы модуля. Уровень кислорода: "
-        << externalTank->GetOxygenLevel() << "%\n";
+        externalTank.reset();
+        std::cout << "externalTank.reset(): владельцев осталось " << backupOwner.use_count()
+            << ", баллон еще жив\n";
 
-    // Корректно очищаем динамическую память externalTank, созданного через new
-    delete externalTank;
-    std::cout << "Внешний баллон (externalTank) удален вручную через delete.\n";
+        // Модуль уничтожается в конце main, но внешний баллон живет независимо от него
+        manualModule.ConsumeModuleOxygen(10.0);
+        std::cout << "Проверка баллона напрямую через backupOwner. Уровень кислорода: "
+            << backupOwner->GetOxygenLevel() << "%\n";
+
+        std::cout << "--> Выход из блока: уничтожается последний владелец backupOwner\n";
+    }
+
+    std::cout << "\n--- 5.2. WEAK_PTR: БАЛЛОН УЖЕ УНИЧТОЖЕН ---\n";
+    std::cout << "Модуль manualModule пытается израсходовать кислород:\n";
+    manualModule.ConsumeModuleOxygen(5.0);
 
     std::cout << "\n=== КОНЕЦ ПРОГРАММЫ ===\n";
     return 0;
