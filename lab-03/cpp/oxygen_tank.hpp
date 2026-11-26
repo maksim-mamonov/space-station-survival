@@ -11,6 +11,7 @@ namespace space_station
         double m_oxygenLevel{ 100.0 };
         int m_capacity{ 100 };
         static constexpr auto TAG = "oxygen_tank";
+        static constexpr double kMaxLevel = 100.0;
 
     public:
         OxygenTank(int capacity, double initialLevel);

@@ -39,7 +39,7 @@ namespace space_station
 
     void OxygenTank::Refill()
     {
-        m_oxygenLevel = static_cast<double>(m_capacity);
+        m_oxygenLevel = kMaxLevel; // уровень хранится в процентах, поэтому полный баллон — 100%
         std::cout << "[OxygenTank] Баллон полностью заправлен. Уровень: " << m_oxygenLevel << "%\n";
     }
 
