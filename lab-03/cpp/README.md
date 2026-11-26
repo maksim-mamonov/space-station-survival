@@ -33,6 +33,9 @@ g++ -std=c++17 -Wall -Wextra *.cpp -o lab03
 MSVC (Developer Command Prompt for Visual Studio):
 
 ```
-cl /std:c++17 /EHsc /utf-8 *.cpp /Fe:lab03.exe
+cl /std:c++17 /EHsc *.cpp /Fe:lab03.exe
 lab03.exe
 ```
+
+Ключ `/utf-8` не нужен: исходники сохранены в UTF-8 с BOM, а строки выводятся
+в кодировке системы, которую программа перекодирует для консоли через `setlocale`.
